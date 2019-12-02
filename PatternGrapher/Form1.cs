@@ -21,55 +21,47 @@ namespace PatternGrapher
         }
 
 
+        //occurs whenever a key press occurs, lets us switch from the various modes.
         private void Form1_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Tab) //switches screen view (options to display)
+            if (e.KeyCode == Keys.Tab) //tab switches screen view (options to display)
             {
-                if (picGraph.Visible) //Fullscreen to Normal
+                if (WindowState == FormWindowState.Maximized) //Fullscreen to Normal
                 {
                     FormBorderStyle = FormBorderStyle.Sizable;
                     WindowState = FormWindowState.Normal;
-                    TopMost = false;
-
-                    picGraph.Visible = false;
-
-                    drawMode = 0;
-                    timer.Enabled = false;
+                    TopMost = false; //topmost makes this window the priority.
                 }
                 else //Normal to Fullscreen
                 {
+                    //switch the window back to window mode
                     FormBorderStyle = FormBorderStyle.None;
                     WindowState = FormWindowState.Maximized;
                     TopMost = true;
-
-                    picGraph.Left = (picGraph.Parent.Width / 2) - (picGraph.Width / 2);
-                    picGraph.Top = (picGraph.Parent.Height / 2) - (picGraph.Height / 2);
-                    picGraph.Visible = true;
-                    timer.Enabled = true;
-
                 }
             }
-            if ((e.KeyCode == Keys.R) && (picGraph.Visible))//RunMode Random 1
+            if ((e.KeyCode == Keys.R) && (picGraph.Visible))//r begins RunMode Random, mode 1
             {
                 drawMode = 1;
             }
-            if ((e.KeyCode == Keys.I) && (picGraph.Visible))//RunMode Iter 2 | short timer
+            if ((e.KeyCode == Keys.I) && (picGraph.Visible))//i begins RunMode Iter, mode 2 | short timer
             {
                 drawMode = 2;
-                timer.Interval = 1;
+                timer.Interval = 10; //100 fps, 10ms equals 100 pictures drawn per sec.
             }
-            if (e.KeyCode == Keys.Space) //turns off drawing
+            if (e.KeyCode == Keys.Space) //space turns off drawing, effectively a pause.
             {
                 drawMode = 0;
-                try { Clipboard.SetImage(picGraph.Image); } catch { }
+                try { Clipboard.SetImage(picGraph.Image); } catch { } //copy the image to the clipboard when we pause, but catch crashes if the image is null.
             }
             if (e.KeyCode == Keys.C) //RunMode Climb 3 | long timer
             {
                 drawMode = 3;
-                timer.Interval = 1000;
+                timer.Interval = 1000; //one image per second.
             }
         }
 
+        //depending on the draw mode render the image.
         private void timer_Tick(object sender, EventArgs e)
         {
             if (drawMode != 0) //Not on no draw mode
@@ -81,14 +73,16 @@ namespace PatternGrapher
                 } else if(drawMode == 2)//Iter 2
                 {
                     picGraph.Image = handler.renderIterFrame();
-                } else
+                }
+                else //Climb 3
                 {
                     picGraph.Image = handler.renderClimbFrame();
                 }
-                setVarText();
+                setVarText(); //update what a,b,c,d are equal to, helpful incase the user wants to know what the equation is.
             }
         }
 
+        //updates what a, b, c, d are equal to, helpful incase the user wants to know what the equation of the picture is
         private void setVarText()
         {
             varLabel0.Text = "a = " + handler.getVar(0);
@@ -97,37 +91,25 @@ namespace PatternGrapher
             varLabel3.Text = "d = " + handler.getVar(3);
         }
 
-        
     }
 
+    //this class handles the image processing / form app inbetween work.
     public class Handler
     {
         Picture picture = null;
         Calculations calc = null;
-        int maxCount = 10000;
+        int maxCount = 8000; //the resolution of the image, the higher the resolution, the slower the image will be made, rec. between 5000 and 15000
 
         public Handler()
         {
-            picture = new Picture();
-            calc = new Calculations();
+            picture = new Picture(1200, 1200);
+            calc = new Calculations(0, 16, 1200, 1200);
         }
 
-        public Bitmap renderRandomFrame()
-        {
-            calc.resetIter(.02);
-            calc.randomizeVars();
-            calc.resetMults();
-            picture.newImage();
-            for (int runCount = 0; runCount <maxCount; runCount++)
-            {
-                picture.setPixelRGB( calc.getX(calc.getT(runCount, maxCount)) , calc.getY(calc.getT(runCount,maxCount)) , 255, 255, 255);
-            }
-            return picture.requestImage();
-        }
-
+        //create the random frame (happens when the user hits r).
         public Bitmap renderRandomIntFrame()
         {
-            calc.iterSome(calc.getRandomN(), .02);
+            calc.iterSome(.02);
             calc.randIntVars();
             picture.newImage();
             for (int runCount = 0; runCount < maxCount; runCount++)
@@ -136,7 +118,7 @@ namespace PatternGrapher
             }
             return picture.requestImage();
         }
-
+        //move some/all of the variables a bit, and render a new image. (happens when the user hits i, and then will continually happen).
         public Bitmap renderIterFrame()
         {
             calc.varIter();
@@ -148,6 +130,7 @@ namespace PatternGrapher
             return picture.requestImage();
         }
 
+        //count the variables up 1 (treating a,b,c,d as a single number), and render a new image (happnens when the user hits c, and then continually happens)
         public Bitmap renderClimbFrame()
         {
             calc.climbVars(1);
@@ -159,23 +142,21 @@ namespace PatternGrapher
             return picture.requestImage();
         }
 
+        //get either a,b,c or d.
         public String getVar(int request) //request a b c or d
         {
-            return ((Math.Round(calc.getVar(request)*10000))/10000).ToString();
+            return ((Math.Round(calc.getVar(request)*10000))/10000).ToString(); //return the variable rounding to the 4th decimal place
         }
     }
 
-
-
-
-
+    //handles the image creation.
     public class Picture
     {
         Bitmap pictureInfo = null;
-        int height, width = 0;
-        public Picture()
+        int height, width;
+        public Picture(int Height, int Width)
         {
-            height = 1500; width = height;
+            height = Height; width = Width;
             pictureInfo = new Bitmap(width, height);
         }
         public Bitmap requestImage()
@@ -187,132 +168,72 @@ namespace PatternGrapher
             pictureInfo = new Bitmap(width, height);
         }
 
+        //get a color type from 3 seperate variables (r,g,b)
         public Color getRGB(int r, int g, int b)
         {
             return Color.FromArgb(255, r, g, b);
         }
-        public Color getHue(double degree)
-        {
-            int r, g, b = 0;
-            if (degree <= 1 / 6.0) // R|b
-            {
-                r = 255; b = 0; degree = (degree * 6) - 0;
-                g = (int)(255 * degree);
-            }
-            else if (degree <= 2 / 6.0)// |Gb
-            {
-                g = 255; b = 0; degree = (degree * 6) - 1;
-                r = (int)(255 * degree);
-            }
-            else if (degree <= 3 / 6.0) // rG|
-            {
-                g = 255; r = 0; degree = (degree * 6) - 2;
-                b = (int)(255 * degree);
-            }
-            else if (degree <= 4 / 6.0) // r|B
-            {
-                b = 255; r = 0; degree = (degree * 6) - 3;
-                g = (int)(255 * degree);
-            }
-            else if (degree <= 5 / 6.0) // |gB
-            {
-                b = 255; g = 0; degree = (degree * 6) - 4;
-                r = (int)(255 * degree);
-            }
-            else // Rg|
-            {
-                r = 255; g = 0; degree = (degree * 6) - 5;
-                b = (int)(255 * degree);
-            }
-            return getRGB(r, g, b); //not a perfect hue, but it should work good enough
-        }
+
+        //set pixel based on coordinate and rgb value
         public void setPixelRGB(int x, int y, int r, int g, int b)
         {
             pictureInfo.SetPixel(x, y, getRGB(r, g, b));
         }
-        public void setPixel(int x, int y, double degree)
-        {
-            pictureInfo.SetPixel(x, y, getHue(degree));
-        }
-        public void setPixelNxN(int x, int y, int size, double degree)
-        {
-            size = (size - 1) / 2;
-            for (int i = -size; i <= size; i++)
-            {
-                for (int a = -size; a <= size; a++)
-                {
-                    pictureInfo.SetPixel(x + a, y + i, getHue(degree));
-                }
-            }
-        }
-        public void setPixelNxNrgb(int x, int y, int size, int r, int g, int b)
-        {
-            size = (size - 1) / 2;
-            for (int i = -size; i <= size; i++)
-            {
-                for (int a = -size; a <= size; a++)
-                {
-                    pictureInfo.SetPixel(x + a, y + i, getRGB(r, g, b));
-                }
-            }
-        }
-        public void setPixelGray(int x, int y, int color)
-        {
-            pictureInfo.SetPixel(x, y, getRGB(color, color, color));
-        }
     }
 
-
+    //handles the math of the pattern generator
     public class Calculations
     {
         //t across equations: (0 to pi)
-        //x = 500cos(at)*cos(bt)+500
-        //y = 500sin(ct)*sin(dt)+500
-        double a, b, c, d = 0; //variables for pattern gen
-        double[] varChange = { 0, 0, 0, 0 }; //changes for iter mode
-        int min = 0; // min value of variables
-        int max = 15; // max value of variables
-        int sclAdj = (1500/2)-1; //for math half image size
-        int aMult = 1; int bMult = 1; int cMult = 1; int dMult = 1;
+        //x = 500cos(at)*cos(bt)+500 // when width = 1000.
+        //y = 500sin(ct)*sin(dt)+500 // when height = 1000.
+
+        double a, b, c, d   = 0; //variables for pattern gen
+        double[] varChange  = { 0, 0, 0, 0 }; //changes for iter mode, think of this like the rate of change of a,b,c,d
+        int min = 0; // min value of variables, for a,b,c,d
+        int max = 15; // max value of variables, for a,b,c,d
+        int width, height; //for math half image size, - 1
+        int aMult = 1; int bMult = 1; int cMult = 1; int dMult = 1; //used for climbing variables, allows the counter to count down as well as up
 
         Random random = null;
         
-        public Calculations()
+        public Calculations(int Min, int Max, int Width, int Height)
         {
             random = new Random();
+            min = Min;
+            max = Max;
+            width = Width-1; //-1 because image goes from 0 to Width - 1.
+            height = Height-1; //-1 because image goes from 0 to Height - 1.
         }
 
+        //get the x coordinate based on t
         public int getX(double t)
         {
-            return (int)Math.Round((sclAdj * Math.Cos(a * t) * Math.Cos(b * t)) + sclAdj);
+            return (int)( (width*(Math.Cos(a*t)*Math.Cos(b*t) + 1.0))/2 );
         }
+        //get the y coordinate based on t
         public int getY(double t)
         {
-            return (int)Math.Round((sclAdj * Math.Sin(c * t) * Math.Sin(d * t)) + sclAdj);
+            return (int)( (height * (Math.Sin(c * t) * Math.Sin(d * t) + 1.0)) / 2 );
         }
 
+        //get t based on which number point we are placing out of how many total points we need to place
         public double getT(int current, int max)
         {
-            return Math.PI*(current + .01) / max;
+            return (Math.PI*current) / (max);
         }
 
-        public void randomizeVars()
-        {
-            a = min + (max - min) * (random.NextDouble());
-            b = min + (max - min) * (random.NextDouble());
-            c = min + (max - min) * (random.NextDouble());
-            d = min + (max - min) * (random.NextDouble());
-        }
+        //randomize a,b,c,d (by int), +1 because random.Next(min, max) will only make numbers 1 less than max.
         public void randIntVars()
         {
-            randomizeVars();
-            a = Math.Round(a);
-            b = Math.Round(b);
-            c = Math.Round(c);
-            d = Math.Round(d);
+            a = random.Next(min, max+1);
+            b = random.Next(min, max+1);
+            c = random.Next(min, max+1);
+            d = random.Next(min, max+1);
         }
 
-        public void resetIter(double change) //copies vars and sets new var changes for each variable
+        //randomizes the rate of change of each variable, change is the speed the vars can move at (like volatility)
+        public void resetIter(double change)
         {
             for (int i = 0; i < 4; i++)
             {
@@ -321,26 +242,31 @@ namespace PatternGrapher
         }
         public void varIter() // changes random number of a b c d and moves them at different speeds
         {
+            //iterate each variable according to its rate of change variable
             a = a + varChange[0];
             b = b + varChange[1];
             c = c + varChange[2];
             d = d + varChange[3];
+
+            //if the rate of change has pushed a,b,c,d over/under its bounds, then invert the rate of change var s it reverses direction
             if (a + varChange[0] >= max || a + varChange[0] <= min) { varChange[0] = -1 * varChange[0]; }
             if (b + varChange[1] >= max || b + varChange[1] <= min) { varChange[1] = -1 * varChange[1]; }
             if (c + varChange[2] >= max || c + varChange[2] <= min) { varChange[2] = -1 * varChange[2]; }
             if (d + varChange[3] >= max || d + varChange[3] <= min) { varChange[3] = -1 * varChange[3]; }
         }
 
-        public void iterSome(int n, double change) // changes random number of a b c d and moves them at different speeds
+        // changes random number of a b c d and moves them at different speeds, change is te speed te vars can move at (like volatility)
+        public void iterSome(double change)
         {
-            resetIter(change);
-            for (int i = 0; i < 4-n; i++) //keeps n of the 4 vars the same, sets the rest to 0
+            resetIter(change); //randomize the rate of change list
+            for (int i = 0; i < random.Next(0,4); i++) //keeps either 0,1,2,3 vars the same, sets the rest to 0
             {
                 varChange[i] = 0;
             }
-            varChange = shuffleList(varChange);
+            varChange = shuffleList(varChange); //to avoid always having the zeroed variables athe beginning of the list, we shuffle it.
         }
 
+        //simply shuffles a list
         public double[] shuffleList(double[] list)
         {
             var count = list.Count();
@@ -355,59 +281,54 @@ namespace PatternGrapher
             return list;
         }
 
+        //returns either a,b,c or d.
         public double getVar(int request) //request a b c or d
         {
             double[] list = {a,b,c,d};
             return list[request];
         }
-
-        public int getRandomN() //Random number between 1 and 4
-        {
-            return random.Next(1,5);
-        }
-
-        public void setVars(double A, double B, double C, double D)
-        {
-            a = A;
-            b = B;
-            c = C;
-            d = D;
-        }
-
+        //increase the vars by the change (normally 1) starts with a, if a goes over/under its bounds, move on to b, and so on.
         public void climbVars(double change)
         {
             a = a + change*(aMult);
-            if(a >= max || a<=min )
+            if(a > max || a<min )
             {
+                a = a - change * (aMult);
                 aMult = aMult * -1;
                 b = b + change*(bMult);
-                if(b >= max || b <= min)
+                if(b > max || b < min)
                 {
+                    b = b - change * (bMult);
                     bMult = bMult * -1;
                     c = c + change*(cMult);
-                    if(c >= max || c <= min)
+                    if(c > max || c < min)
                     {
+                        c = c - change * (cMult);
                         cMult = cMult * -1;
                         d = d + change*(dMult);
-                        if(d >= max || d <= min)
+                        if(d > max || d < min)
                         {
+                            d = d - change * (dMult);
                             dMult = dMult * -1;
                         }
                     }
                 }
             }
         }
-        public void resetMults()
+
+        //set a,b,c,d by custom value.
+        public void setVars(int A, int B, int C, int D)
         {
-            aMult = 1; bMult = 1; cMult = 1; dMult = 1;
+            a = A; b = B; c = C; d = D;
         }
 
-        public void modifyVars(int aC, int bC, int cC, int dC)
+        //set a,b,c,d rate of change by custom value.
+        public void setVars(double dA, double dB, double dC, double dD)
         {
-            a = a + aC;
-            b = b + bC;
-            c = c + cC;
-            d = d + dC;
+            varChange[0] = dA;
+            varChange[1] = dB;
+            varChange[2] = dC;
+            varChange[3] = dD;
         }
     }
 }
